@@ -50,10 +50,12 @@ export default function Home() {
             <ul className="space-y-3">
               {tasks.map((task) => (
                 <li
-                  key={task}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm text-zinc-300"
+                  key={task.label}
+                  className={`rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm ${
+                    task.done ? "text-zinc-500 line-through" : "text-zinc-300"
+                  }`}
                 >
-                  {task}
+                  {task.label}
                 </li>
               ))}
             </ul>

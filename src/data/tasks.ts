@@ -1,7 +1,7 @@
-export const tasks = [
-  "Create dashboard layout",
-  "Add project cards",
-  "Add cost tracker placeholder",
-  "Create data files",
-  "Commit data-driven dashboard update",
+export const tasks: { label: string; done: boolean }[] = [
+  { label: "Create dashboard layout", done: true },
+  { label: "Add project cards", done: true },
+  { label: "Add cost tracker placeholder", done: true },
+  { label: "Create data files", done: true },
+  { label: "Commit data-driven dashboard update", done: false },
 ];
