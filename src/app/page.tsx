@@ -1,15 +1,6 @@
-const projects = [
-  { name: "Command Center", status: "Active", focus: "Build V1 dashboard" },
-  { name: "Game Prototype", status: "Planning", focus: "Define core loop" },
-  { name: "AI Workflow System", status: "Research", focus: "Create reusable scaffold" },
-];
-
-const tasks = [
-  "Create dashboard layout",
-  "Add project cards",
-  "Add cost tracker placeholder",
-  "Commit initial scaffold to GitHub",
-];
+import { projects } from "@/data/projects";
+import { tasks } from "@/data/tasks";
+import { costs, totalMonthlyCost } from "@/data/costs";
 
 export default function Home() {
   return (
@@ -70,10 +61,31 @@ export default function Home() {
         </div>
 
         <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="text-xl font-semibold">AI Spend Tracker</h2>
-          <p className="mt-2 text-zinc-400">
-            Placeholder: ChatGPT Plus — $20/month. Cursor and Claude pending.
-          </p>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">AI Spend Tracker</h2>
+            <span className="text-sm text-zinc-400">
+              ${totalMonthlyCost}/month planned
+            </span>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {costs.map((cost) => (
+              <div
+                key={cost.name}
+                className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">{cost.name}</h3>
+                  <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                    {cost.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-zinc-400">
+                  ${cost.monthlyCost}/month
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
       </div>
     </main>
