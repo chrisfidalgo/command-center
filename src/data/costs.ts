@@ -5,15 +5,15 @@ export const costs = [
     status: "Active",
   },
   {
+    name: "Claude Pro",
+    monthlyCost: 20,
+    status: "Active",
+  },
+  {
     name: "Cursor",
     monthlyCost: 20,
     status: "Considering",
-  },
-  {
-    name: "Claude Pro",
-    monthlyCost: 17,
-    status: "Considering",
-  },
+  }
 ];
 
 export const totalMonthlyCost = costs.reduce(
