@@ -5,13 +5,18 @@ export const projects = [
     focus: "Build V1 dashboard",
   },
   {
-    name: "Game Prototype",
+    name: "MyPedestal",
+    status: "In Motion",
+    focus: "Project planning",
+  },
+  {
+    name: "Game Prototype Kit",
     status: "Planning",
-    focus: "Define core loop",
+    focus: "Define transportable AI kit",
   },
   {
     name: "AI Workflow System",
     status: "Research",
     focus: "Create reusable scaffold",
-  },
+  }
 ];

@@ -1,6 +1,17 @@
 import { projects } from "@/data/projects";
 import { tasks } from "@/data/tasks";
 import { costs, totalMonthlyCost } from "@/data/costs";
+import { MODEL_PRICES } from "@/lib/api-cost-calculator";
+import { parseSessionLogs } from "@/lib/parse-session-logs";
+import TaskPanel from "@/app/components/TaskPanel";
+import ApiUsagePanel from "@/app/components/ApiUsagePanel";
+
+const statusColors: Record<string, string> = {
+  "Active":    "bg-purple-900/60 text-purple-300",
+  "In Motion": "bg-green-900/60 text-green-300",
+  "Planning":  "bg-yellow-900/60 text-yellow-300",
+  "Research":  "bg-blue-900/60 text-blue-300",
+};
 
 export default function Home() {
   return (
@@ -35,7 +46,7 @@ export default function Home() {
                 >
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{project.name}</h3>
-                    <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[project.status] ?? "bg-zinc-800 text-zinc-300"}`}>
                       {project.status}
                     </span>
                   </div>
@@ -45,48 +56,88 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <h2 className="mb-4 text-xl font-semibold">Next Tasks</h2>
-            <ul className="space-y-3">
-              {tasks.map((task) => (
-                <li
-                  key={task.label}
-                  className={`rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm ${
-                    task.done ? "text-zinc-500 line-through" : "text-zinc-300"
-                  }`}
-                >
-                  {task.label}
-                </li>
-              ))}
-            </ul>
-          </section>
+          <TaskPanel
+            initialActive={tasks.filter((t) => !t.backlog)}
+            initialBacklog={tasks.filter((t) => t.backlog)}
+          />
         </div>
 
         <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">AI Spend Tracker</h2>
             <span className="text-sm text-zinc-400">
-              ${totalMonthlyCost}/month planned
+              ${totalMonthlyCost}/month subscriptions
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {costs.map((cost) => (
-              <div
-                key={cost.name}
-                className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium">{cost.name}</h3>
-                  <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
-                    {cost.status}
-                  </span>
+          {/* Daily API usage */}
+          <div className="mt-4">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-500">
+              API Usage — Last 7 Days
+            </h3>
+            <ApiUsagePanel usageLog={parseSessionLogs()} />
+          </div>
+
+          {/* Model pricing reference */}
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-500">
+              Model Pricing Reference · per 1M tokens
+            </h3>
+            <div className="mt-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-left text-xs uppercase tracking-wider text-zinc-500">
+                    <th className="px-4 py-2">Model</th>
+                    <th className="px-4 py-2 text-right">Input</th>
+                    <th className="px-4 py-2 text-right">Output</th>
+                    <th className="px-4 py-2 text-right">Cache Write</th>
+                    <th className="px-4 py-2 text-right">Cache Read</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(MODEL_PRICES).map(([model, prices]) => (
+                    <tr
+                      key={model}
+                      className="border-b border-zinc-800/50 last:border-0 text-zinc-400"
+                    >
+                      <td className="px-4 py-2 font-mono text-xs">{model}</td>
+                      <td className="px-4 py-2 text-right">${prices.input.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">${prices.output.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-yellow-600">${prices.cacheWrite.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-green-600">${prices.cacheRead.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-4 py-3 text-xs text-zinc-600">
+                Cache write costs 1.25× input (investment). Cache read costs ~10% of input (payoff after ~1.3 calls).
+              </p>
+            </div>
+          </div>
+
+          {/* Subscriptions */}
+          <div className="mt-6">
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-500">
+              Subscriptions
+            </h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              {costs.map((cost) => (
+                <div
+                  key={cost.name}
+                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium">{cost.name}</h3>
+                    <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300">
+                      {cost.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-zinc-400">
+                    ${cost.monthlyCost}/month · flat rate
+                  </p>
                 </div>
-                <p className="mt-2 text-sm text-zinc-400">
-                  ${cost.monthlyCost}/month
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </section>
       </div>
