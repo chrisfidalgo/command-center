@@ -1,6 +1,7 @@
 import { projects } from "@/data/projects";
 import { tasks } from "@/data/tasks";
 import { costs, totalMonthlyCost } from "@/data/costs";
+import { agents } from "@/data/agents";
 import { MODEL_PRICES } from "@/lib/api-cost-calculator";
 import { parseSessionLogs } from "@/lib/parse-session-logs";
 import TaskPanel from "@/app/components/TaskPanel";
@@ -61,6 +62,30 @@ export default function Home() {
             initialBacklog={tasks.filter((t) => t.backlog)}
           />
         </div>
+
+        <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+          <h2 className="mb-4 text-xl font-semibold">Agent Roster</h2>
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+            {agents.map((agent) => (
+              <div
+                key={agent.prefix}
+                className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-zinc-500">{agent.prefix} ||</span>
+                  {agent.isNew && (
+                    <span className="rounded-full bg-purple-900/60 px-2 py-0.5 text-xs font-medium text-purple-300">
+                      New
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 font-medium">{agent.name}</p>
+                <p className="text-xs text-zinc-500">{agent.role}</p>
+                <p className="mt-2 text-xs text-zinc-400">{agent.summary}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
           <div className="flex items-center justify-between">
