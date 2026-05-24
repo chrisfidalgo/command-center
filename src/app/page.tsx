@@ -1,18 +1,10 @@
-import { projects } from "@/data/projects";
-import { tasks } from "@/data/tasks";
 import { costs, totalMonthlyCost } from "@/data/costs";
 import { agents } from "@/data/agents";
 import { MODEL_PRICES } from "@/lib/api-cost-calculator";
 import { parseSessionLogs } from "@/lib/parse-session-logs";
 import TaskPanel from "@/app/components/TaskPanel";
+import ProjectsPanel from "@/app/components/ProjectsPanel";
 import ApiUsagePanel from "@/app/components/ApiUsagePanel";
-
-const statusColors: Record<string, string> = {
-  "Active":    "bg-purple-900/60 text-purple-300",
-  "In Motion": "bg-green-900/60 text-green-300",
-  "Planning":  "bg-yellow-900/60 text-yellow-300",
-  "Research":  "bg-blue-900/60 text-blue-300",
-};
 
 export default function Home() {
   return (
@@ -37,30 +29,8 @@ export default function Home() {
         </section>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <h2 className="mb-4 text-xl font-semibold">Projects</h2>
-            <div className="space-y-3">
-              {projects.map((project) => (
-                <div
-                  key={project.name}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">{project.name}</h3>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColors[project.status] ?? "bg-zinc-800 text-zinc-300"}`}>
-                      {project.status}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-zinc-400">{project.focus}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <TaskPanel
-            initialActive={tasks.filter((t) => !t.backlog)}
-            initialBacklog={tasks.filter((t) => t.backlog)}
-          />
+          <ProjectsPanel />
+          <TaskPanel />
         </div>
 
         <section className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
@@ -71,14 +41,13 @@ export default function Home() {
                 key={agent.prefix}
                 className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-zinc-500">{agent.prefix} ||</span>
-                  {agent.isNew && (
+                {agent.isNew && (
+                  <div className="flex justify-end">
                     <span className="rounded-full bg-purple-900/60 px-2 py-0.5 text-xs font-medium text-purple-300">
                       New
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
                 <p className="mt-1 font-medium">{agent.name}</p>
                 <p className="text-xs text-zinc-500">{agent.role}</p>
                 <p className="mt-2 text-xs text-zinc-400">{agent.summary}</p>
@@ -100,7 +69,7 @@ export default function Home() {
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-500">
               API Usage — Last 7 Days
             </h3>
-            <ApiUsagePanel usageLog={parseSessionLogs()} />
+            <ApiUsagePanel summary={parseSessionLogs()} />
           </div>
 
           {/* Model pricing reference */}

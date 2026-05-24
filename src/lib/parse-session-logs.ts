@@ -2,119 +2,204 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { calculateApiCost } from './api-cost-calculator'
-import type { DailyUsageEntry } from '@/data/usage-log'
 
-const SESSIONS_DIR = path.join(
-  os.homedir(),
-  '.claude',
-  'projects',
-  'd--GitProjects-command-center'
-)
-
+// ── Config ────────────────────────────────────────────────────────────────────
+const GIT_PROJECTS_ROOT = 'D:\\GitProjects'
+const BLACKLIST = new Set(['galactic-match'])
+const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects')
 const MODEL = 'claude-sonnet-4-6'
+// ─────────────────────────────────────────────────────────────────────────────
 
-interface RawUsage {
-  input_tokens?: number
-  cache_creation_input_tokens?: number
-  cache_read_input_tokens?: number
-  output_tokens?: number
-}
-
-interface DailyAccumulator {
+export interface ProjectDayEntry {
+  project: string
   date: string
   calls: number
   inputTokens: number
   cacheWriteTokens: number
   cacheReadTokens: number
   outputTokens: number
+  estimatedCostUsd: number
 }
 
-export function parseSessionLogs(days = 7): DailyUsageEntry[] {
-  if (!fs.existsSync(SESSIONS_DIR)) return []
+export interface ProjectSummary {
+  project: string
+  calls: number
+  inputTokens: number
+  cacheWriteTokens: number
+  cacheReadTokens: number
+  outputTokens: number
+  estimatedCostUsd: number
+}
 
-  const files = fs.readdirSync(SESSIONS_DIR).filter((f) => f.endsWith('.jsonl'))
-  const seen = new Set<string>()
-  const byDate: Record<string, DailyAccumulator> = {}
+export interface DailyTotal {
+  date: string
+  calls: number
+  inputTokens: number
+  cacheWriteTokens: number
+  cacheReadTokens: number
+  outputTokens: number
+  estimatedCostUsd: number
+}
 
-  for (const file of files) {
-    const lines = fs
-      .readFileSync(path.join(SESSIONS_DIR, file), 'utf8')
-      .split('\n')
-      .filter(Boolean)
+export interface SessionLogSummary {
+  byProject: ProjectSummary[]
+  byDate: DailyTotal[]
+  entries: ProjectDayEntry[]
+}
 
-    for (const line of lines) {
-      try {
-        const obj = JSON.parse(line)
-        if (obj.type !== 'assistant') continue
+function getProjectName(cwd: string): string {
+  // Handle edge case: cwd is inside .claude subdir (e.g. BackyardBlitz)
+  const base = path.basename(cwd)
+  return base === '.claude' ? path.basename(path.dirname(cwd)) : base
+}
 
-        const rid: string | undefined = obj.requestId
-        if (!rid || seen.has(rid)) continue
-        seen.add(rid)
+function isUnderRoot(cwd: string): boolean {
+  return cwd.toLowerCase().startsWith(GIT_PROJECTS_ROOT.toLowerCase())
+}
 
-        const u: RawUsage | undefined = obj.message?.usage
-        if (!u) continue
+function dateFromNow(daysAgo: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - daysAgo)
+  return d.toISOString().slice(0, 10)
+}
 
-        const date: string = obj.timestamp.slice(0, 10)
-        if (!byDate[date]) {
-          byDate[date] = { date, calls: 0, inputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 }
-        }
+export function parseSessionLogs(days = 7): SessionLogSummary {
+  if (!fs.existsSync(CLAUDE_PROJECTS_DIR)) {
+    return { byProject: [], byDate: [], entries: [] }
+  }
 
-        byDate[date].calls++
-        byDate[date].inputTokens += u.input_tokens ?? 0
-        byDate[date].cacheWriteTokens += u.cache_creation_input_tokens ?? 0
-        byDate[date].cacheReadTokens += u.cache_read_input_tokens ?? 0
-        byDate[date].outputTokens += u.output_tokens ?? 0
-      } catch {
-        // malformed line — skip
+  const cutoff = dateFromNow(days - 1)
+
+  // Map: "project|date" → accumulator
+  const acc: Record<string, ProjectDayEntry> = {}
+
+  for (const slug of fs.readdirSync(CLAUDE_PROJECTS_DIR)) {
+    const slugPath = path.join(CLAUDE_PROJECTS_DIR, slug)
+    if (!fs.statSync(slugPath).isDirectory()) continue
+
+    const jsonlFiles = fs.readdirSync(slugPath).filter((f) => f.endsWith('.jsonl'))
+    if (!jsonlFiles.length) continue
+
+    // Determine cwd and project name from the first line that has a cwd field
+    let projectCwd: string | null = null
+    outer: for (const file of jsonlFiles) {
+      for (const line of fs.readFileSync(path.join(slugPath, file), 'utf8').split('\n')) {
+        try {
+          const obj = JSON.parse(line)
+          if (obj.cwd) { projectCwd = obj.cwd; break outer }
+        } catch { /* skip */ }
+      }
+    }
+
+    if (!projectCwd || !isUnderRoot(projectCwd)) continue
+
+    const project = getProjectName(projectCwd)
+    if (BLACKLIST.has(project)) continue
+
+    // Parse all JSONL files for this project, deduplicated by requestId
+    const seen = new Set<string>()
+    for (const file of jsonlFiles) {
+      for (const line of fs.readFileSync(path.join(slugPath, file), 'utf8').split('\n')) {
+        try {
+          const obj = JSON.parse(line)
+          if (obj.type !== 'assistant') continue
+
+          const rid: string | undefined = obj.requestId
+          if (!rid || seen.has(rid)) continue
+          seen.add(rid)
+
+          const u = obj.message?.usage
+          if (!u) continue
+
+          const date: string = obj.timestamp.slice(0, 10)
+          if (date < cutoff) continue
+
+          const key = `${project}|${date}`
+          if (!acc[key]) {
+            acc[key] = {
+              project,
+              date,
+              calls: 0,
+              inputTokens: 0,
+              cacheWriteTokens: 0,
+              cacheReadTokens: 0,
+              outputTokens: 0,
+              estimatedCostUsd: 0,
+            }
+          }
+
+          acc[key].calls++
+          acc[key].inputTokens += u.input_tokens ?? 0
+          acc[key].cacheWriteTokens += u.cache_creation_input_tokens ?? 0
+          acc[key].cacheReadTokens += u.cache_read_input_tokens ?? 0
+          acc[key].outputTokens += u.output_tokens ?? 0
+        } catch { /* skip */ }
       }
     }
   }
 
-  // Sort newest-first, take last N days
-  const sorted = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date))
-  const window = sorted.slice(0, days)
+  // Compute costs per entry
+  const entries: ProjectDayEntry[] = Object.values(acc).map((e) => ({
+    ...e,
+    estimatedCostUsd: calculateApiCost(
+      {
+        input_tokens: e.inputTokens,
+        output_tokens: e.outputTokens,
+        cache_creation_input_tokens: e.cacheWriteTokens,
+        cache_read_input_tokens: e.cacheReadTokens,
+      },
+      MODEL
+    ).costs.total,
+  }))
 
-  // Pad with empty rows so the table always shows the full window
-  const result: DailyUsageEntry[] = []
-  for (let i = 0; i < days; i++) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().slice(0, 10)
-    const found = window.find((e) => e.date === dateStr)
-
-    if (found) {
-      const cost = calculateApiCost(
-        {
-          input_tokens: found.inputTokens,
-          output_tokens: found.outputTokens,
-          cache_creation_input_tokens: found.cacheWriteTokens,
-          cache_read_input_tokens: found.cacheReadTokens,
-        },
-        MODEL
-      )
-      result.push({
-        date: found.date,
-        calls: found.calls,
-        inputTokens: found.inputTokens,
-        outputTokens: found.outputTokens,
-        cacheWriteTokens: found.cacheWriteTokens,
-        cacheReadTokens: found.cacheReadTokens,
-        estimatedCostUsd: cost.costs.total,
-        source: 'subscription',
-      })
-    } else {
-      result.push({
-        date: dateStr,
-        calls: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheWriteTokens: 0,
-        cacheReadTokens: 0,
-        estimatedCostUsd: 0,
-        source: 'subscription',
-      })
+  // Roll up by project
+  const projectMap: Record<string, ProjectSummary> = {}
+  for (const e of entries) {
+    if (!projectMap[e.project]) {
+      projectMap[e.project] = {
+        project: e.project,
+        calls: 0, inputTokens: 0, cacheWriteTokens: 0,
+        cacheReadTokens: 0, outputTokens: 0, estimatedCostUsd: 0,
+      }
     }
+    const p = projectMap[e.project]
+    p.calls += e.calls
+    p.inputTokens += e.inputTokens
+    p.cacheWriteTokens += e.cacheWriteTokens
+    p.cacheReadTokens += e.cacheReadTokens
+    p.outputTokens += e.outputTokens
+    p.estimatedCostUsd += e.estimatedCostUsd
   }
 
-  return result
+  const byProject = Object.values(projectMap).sort(
+    (a, b) => b.estimatedCostUsd - a.estimatedCostUsd
+  )
+
+  // Roll up by date — pad to full window
+  const dateMap: Record<string, DailyTotal> = {}
+  for (const e of entries) {
+    if (!dateMap[e.date]) {
+      dateMap[e.date] = {
+        date: e.date, calls: 0, inputTokens: 0, cacheWriteTokens: 0,
+        cacheReadTokens: 0, outputTokens: 0, estimatedCostUsd: 0,
+      }
+    }
+    const d = dateMap[e.date]
+    d.calls += e.calls
+    d.inputTokens += e.inputTokens
+    d.cacheWriteTokens += e.cacheWriteTokens
+    d.cacheReadTokens += e.cacheReadTokens
+    d.outputTokens += e.outputTokens
+    d.estimatedCostUsd += e.estimatedCostUsd
+  }
+
+  const byDate: DailyTotal[] = Array.from({ length: days }, (_, i) => {
+    const date = dateFromNow(i)
+    return dateMap[date] ?? {
+      date, calls: 0, inputTokens: 0, cacheWriteTokens: 0,
+      cacheReadTokens: 0, outputTokens: 0, estimatedCostUsd: 0,
+    }
+  })
+
+  return { byProject, byDate, entries }
 }

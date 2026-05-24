@@ -54,6 +54,5 @@ export const agents: Agent[] = [
     name: "Pamela",
     role: "Product Manager",
     summary: "Business strategy, cost estimation, budgets, risk assessment, and operational planning.",
-    isNew: true,
   },
 ];
