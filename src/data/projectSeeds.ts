@@ -27,7 +27,7 @@ export const projectSeeds: Project[] = [
     category: 'game',
     description: 'Project planning underway. Details TBD.',
     links: [],
-    agentAssignments: ['JEFF', 'D'],
+    agentAssignments: ['JEFF', 'DEZ'],
     status: 'active',
     createdAt: '2026-04-15T00:00:00.000Z',
     gates: [
@@ -48,7 +48,7 @@ export const projectSeeds: Project[] = [
     category: 'tool',
     description: 'A transportable AI kit for spinning up game prototypes quickly with consistent scaffolding.',
     links: [],
-    agentAssignments: ['CID', 'D'],
+    agentAssignments: ['CID', 'DEZ'],
     status: 'active',
     createdAt: '2026-05-01T00:00:00.000Z',
     gates: [

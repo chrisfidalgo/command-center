@@ -26,8 +26,8 @@ export const agents: Agent[] = [
     summary: "Architecture, refactoring, debugging, implementation plans, and code review.",
   },
   {
-    prefix: "D",
-    name: "D",
+    prefix: "DEZ",
+    name: "Dez",
     role: "Designer",
     summary: "Gameplay systems, combat design, progression, balance, and player experience.",
   },
