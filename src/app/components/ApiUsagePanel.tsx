@@ -46,20 +46,20 @@ function fmtCost(n: number) {
   return n > 0 ? `$${n.toFixed(4)}` : <span className="text-zinc-700">$0.00</span>
 }
 
-function SummaryCards({ total, noCacheTotal }: { total: number; noCacheTotal: number }) {
+function SummaryCards({ total, noCacheTotal, days }: { total: number; noCacheTotal: number; days: number }) {
   const saved = noCacheTotal - total
   const pct = noCacheTotal > 0 ? ((saved / noCacheTotal) * 100).toFixed(0) : '—'
   return (
     <div className="mt-3 grid grid-cols-3 gap-3">
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-        <p className="text-xs uppercase tracking-wider text-zinc-500">7-day cost</p>
+        <p className="text-xs uppercase tracking-wider text-zinc-500">{days}-day cost</p>
         <p className="mt-1 text-lg font-semibold text-zinc-100">${total.toFixed(2)}</p>
-        <p className="mt-0.5 text-xs text-zinc-500">~${(total * 30 / 7).toFixed(2)}/month projected</p>
+        <p className="mt-0.5 text-xs text-zinc-500">~${(total * 30 / days).toFixed(2)}/month projected</p>
       </div>
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
         <p className="text-xs uppercase tracking-wider text-zinc-500">Without caching</p>
         <p className="mt-1 text-lg font-semibold text-zinc-400">${noCacheTotal.toFixed(2)}</p>
-        <p className="mt-0.5 text-xs text-zinc-500">~${(noCacheTotal * 30 / 7).toFixed(2)}/month projected</p>
+        <p className="mt-0.5 text-xs text-zinc-500">~${(noCacheTotal * 30 / days).toFixed(2)}/month projected</p>
       </div>
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
         <p className="text-xs uppercase tracking-wider text-zinc-500">Saved by caching</p>
@@ -222,7 +222,7 @@ function BenchmarkView() {
           </tbody>
         </table>
       </div>
-      <SummaryCards total={BENCHMARK_TOTAL} noCacheTotal={BENCHMARK_NO_CACHE_TOTAL} />
+      <SummaryCards total={BENCHMARK_TOTAL} noCacheTotal={BENCHMARK_NO_CACHE_TOTAL} days={7} />
       <p className="mt-2 px-1 text-xs text-zinc-600">
         Simulated — representative of a heavy Claude Code week across multiple projects.
         Yellow = cache write (1.25× input rate). Green = cache read (0.10× input rate).
@@ -241,7 +241,7 @@ function NoData() {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function ApiUsagePanel({ summary }: { summary: SessionLogSummary }) {
+export default function ApiUsagePanel({ summary, days = 30 }: { summary: SessionLogSummary; days?: number }) {
   const [tab, setTab] = useState<'actual' | 'projects' | 'benchmark'>('benchmark')
 
   const tabs = [
@@ -250,10 +250,10 @@ export default function ApiUsagePanel({ summary }: { summary: SessionLogSummary 
     { id: 'benchmark', label: 'Benchmark' },
   ] as const
 
-  const hasData = summary.byProject.length > 0
+  const hasData = summary.byProject.length > 0 || summary.byDate.some(d => d.calls > 0)
 
-  const total7d = summary.byDate.reduce((s, e) => s + e.estimatedCostUsd, 0)
-  const noCacheTotal7d = summary.byDate.reduce((s, e) => {
+  const totalCost = summary.byDate.reduce((s, e) => s + e.estimatedCostUsd, 0)
+  const noCacheTotal = summary.byDate.reduce((s, e) => {
     const allInput = e.inputTokens + e.cacheWriteTokens + e.cacheReadTokens
     return s + calculateApiCost({ input_tokens: allInput, output_tokens: e.outputTokens }, MODEL).costs.total
   }, 0)
@@ -286,10 +286,10 @@ export default function ApiUsagePanel({ summary }: { summary: SessionLogSummary 
           hasData ? (
             <>
               <DateTable dates={summary.byDate} />
-              <SummaryCards total={total7d} noCacheTotal={noCacheTotal7d} />
+              <SummaryCards total={totalCost} noCacheTotal={noCacheTotal} days={days} />
               <p className="mt-2 px-1 text-xs text-zinc-600">
-                Subscription usage across all GitProjects — costs are simulated API equivalent, not billed.
-                Scans <code className="text-zinc-500">~/.claude/projects/</code> for sessions under D:\GitProjects.
+                Combined history: live sessions from <code className="text-zinc-500">~/.claude/projects/</code> merged
+                with <code className="text-zinc-500">usage-history.json</code>. Costs are API-equivalent, not billed.
               </p>
             </>
           ) : <NoData />
@@ -302,9 +302,10 @@ export default function ApiUsagePanel({ summary }: { summary: SessionLogSummary 
               <div className="mt-4">
                 <ProjectTable projects={summary.byProject} />
               </div>
-              <SummaryCards total={total7d} noCacheTotal={noCacheTotal7d} />
+              <SummaryCards total={totalCost} noCacheTotal={noCacheTotal} days={days} />
               <p className="mt-2 px-1 text-xs text-zinc-600">
-                Sorted by estimated cost. Bars show relative spend — top project is 100%.
+                Live sessions only — project breakdown not available in historical data.
+                Sorted by estimated cost.
               </p>
             </>
           ) : <NoData />

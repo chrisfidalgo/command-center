@@ -1,7 +1,7 @@
 import { costs, totalMonthlyCost } from "@/data/costs";
 import { agents } from "@/data/agents";
 import { MODEL_PRICES } from "@/lib/api-cost-calculator";
-import { parseSessionLogs } from "@/lib/parse-session-logs";
+import { getMergedSummary } from "@/lib/parse-session-logs";
 import TaskPanel from "@/app/components/TaskPanel";
 import ProjectsPanel from "@/app/components/ProjectsPanel";
 import ApiUsagePanel from "@/app/components/ApiUsagePanel";
@@ -67,9 +67,9 @@ export default function Home() {
           {/* Daily API usage */}
           <div className="mt-4">
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-zinc-500">
-              API Usage — Last 7 Days
+              API Usage — Last 30 Days
             </h3>
-            <ApiUsagePanel summary={parseSessionLogs()} />
+            <ApiUsagePanel summary={getMergedSummary(30)} />
           </div>
 
           {/* Model pricing reference */}

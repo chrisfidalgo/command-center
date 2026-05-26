@@ -4,11 +4,78 @@ import os from 'os'
 import { calculateApiCost } from './api-cost-calculator'
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const GIT_PROJECTS_ROOT = 'D:\\GitProjects'
+const GIT_PROJECTS_ROOT = 'C:\\Users\\cfida\\Documents\\projects\\git'
 const BLACKLIST = new Set(['galactic-match'])
 const CLAUDE_PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects')
 const MODEL = 'claude-sonnet-4-6'
+const HISTORY_PATH = path.join(process.cwd(), 'src', 'data', 'usage-history.csv')
 // ─────────────────────────────────────────────────────────────────────────────
+
+export interface HistoryEntry {
+  date: string
+  calls: number
+  inputTokens: number
+  cacheWriteTokens: number
+  cacheReadTokens: number
+  outputTokens: number
+  estimatedCostUsd: number
+  source: string
+}
+
+export function loadUsageHistory(): HistoryEntry[] {
+  try {
+    const lines = fs.readFileSync(HISTORY_PATH, 'utf8').trim().split('\n')
+    return lines.slice(1).map((line) => {
+      const [date, calls, input_tokens, cache_write_tokens, cache_read_tokens, output_tokens, estimated_cost_usd, source] = line.split(',')
+      return {
+        date,
+        calls: parseInt(calls, 10),
+        inputTokens: parseInt(input_tokens, 10),
+        cacheWriteTokens: parseInt(cache_write_tokens, 10),
+        cacheReadTokens: parseInt(cache_read_tokens, 10),
+        outputTokens: parseInt(output_tokens, 10),
+        estimatedCostUsd: parseFloat(estimated_cost_usd),
+        source: source?.trim() ?? 'unknown',
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
+export function getMergedSummary(days = 30): SessionLogSummary {
+  const live = parseSessionLogs(days)
+  const history = loadUsageHistory()
+
+  // Live data wins on any date it has calls; history fills the rest
+  const merged: Record<string, DailyTotal> = {}
+  for (const d of live.byDate) {
+    if (d.calls > 0) merged[d.date] = d
+  }
+  for (const h of history) {
+    if (!merged[h.date]) {
+      merged[h.date] = {
+        date: h.date,
+        calls: h.calls,
+        inputTokens: h.inputTokens,
+        cacheWriteTokens: h.cacheWriteTokens,
+        cacheReadTokens: h.cacheReadTokens,
+        outputTokens: h.outputTokens,
+        estimatedCostUsd: h.estimatedCostUsd,
+      }
+    }
+  }
+
+  const byDate: DailyTotal[] = Array.from({ length: days }, (_, i) => {
+    const date = dateFromNow(i)
+    return merged[date] ?? {
+      date, calls: 0, inputTokens: 0, cacheWriteTokens: 0,
+      cacheReadTokens: 0, outputTokens: 0, estimatedCostUsd: 0,
+    }
+  })
+
+  return { byProject: live.byProject, byDate, entries: live.entries }
+}
 
 export interface ProjectDayEntry {
   project: string
